@@ -1,15 +1,19 @@
+from pathlib import Path
+
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./learning_buddy.db"
+from app.core.config import settings
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+_connect_args = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    _connect_args = {"check_same_thread": False}
+    db_path = settings.DATABASE_URL.removeprefix("sqlite:///")
+    if db_path and db_path != ":memory:":
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
+engine = create_engine(settings.DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
 

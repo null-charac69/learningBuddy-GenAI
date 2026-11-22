@@ -1,30 +1,86 @@
-
-
-import PyPDF2
-import docx
+"""Text extraction and chunking for uploaded study material."""
 import csv
+import io
+from pathlib import Path
 
-def extract_text_from_pdf(file):
-    reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+import docx
+from pypdf import PdfReader
 
-def extract_text_from_docx(file):
-    doc = docx.Document(file)
-    text = ""
-    for para in doc.paragraphs:
-        text += para.text
-    return text
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".csv"}
 
-def extract_text_from_txt(file):
-    return file.read().decode("utf-8")
 
-def extract_text_from_csv(file):
-    text = ""
-    decoded_file = file.read().decode("utf-8").splitlines()
-    reader = csv.reader(decoded_file)
-    for row in reader:
-        text += ",".join(row) + "\n"
-    return text
+class UnsupportedFileError(ValueError):
+    pass
+
+
+def _decode(data: bytes) -> str:
+    for encoding in ("utf-8", "utf-16", "latin-1"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="ignore")
+
+
+def _pdf(data: bytes) -> str:
+    reader = PdfReader(io.BytesIO(data))
+    pages = [(page.extract_text() or "").strip() for page in reader.pages]
+    return "\n\n".join(p for p in pages if p)
+
+
+def _docx(data: bytes) -> str:
+    document = docx.Document(io.BytesIO(data))
+    parts = [p.text for p in document.paragraphs if p.text.strip()]
+    for table in document.tables:
+        for row in table.rows:
+            parts.append(" | ".join(cell.text.strip() for cell in row.cells))
+    return "\n".join(parts)
+
+
+def _csv(data: bytes) -> str:
+    rows = csv.reader(io.StringIO(_decode(data)))
+    return "\n".join(", ".join(row) for row in rows)
+
+
+def extract_text(filename: str, data: bytes) -> str:
+    ext = Path(filename).suffix.lower()
+    if ext == ".pdf":
+        return _pdf(data)
+    if ext == ".docx":
+        return _docx(data)
+    if ext == ".csv":
+        return _csv(data)
+    if ext in (".txt", ".md"):
+        return _decode(data)
+    raise UnsupportedFileError(
+        f"Unsupported file type '{ext or filename}'. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
+    )
+
+
+def chunk_text(text: str, size: int = 1200, overlap: int = 200) -> list[str]:
+    """Split text into overlapping chunks, preferring paragraph/sentence boundaries."""
+    text = "\n".join(line.rstrip() for line in text.replace("\r\n", "\n").split("\n")).strip()
+    if not text:
+        return []
+    if len(text) <= size:
+        return [text]
+
+    chunks: list[str] = []
+    start = 0
+    while start < len(text):
+        end = min(start + size, len(text))
+        if end < len(text):
+            window = text[start:end]
+            # Break on the last paragraph, line, or sentence boundary in the back half of the window.
+            for sep in ("\n\n", "\n", ". ", " "):
+                cut = window.rfind(sep)
+                if cut > size // 2:
+                    end = start + cut + len(sep)
+                    break
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        if end >= len(text):
+            break
+        start = max(end - overlap, start + 1)
+    return chunks

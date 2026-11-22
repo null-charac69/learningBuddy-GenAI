@@ -1,4 +1,3 @@
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
@@ -11,7 +10,13 @@ module.exports = {
         highlight: '#2b6cb0',
         text: '#e2e8f0',
         "text-secondary": '#a0aec0',
-      }
+        success: '#38a169',
+        danger: '#e53e3e',
+        warning: '#d69e2e',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
     },
   },
   plugins: [],

@@ -1,128 +1,59 @@
-
-
-
 import React from 'react';
-
 import { Line } from 'react-chartjs-2';
-
 import {
-
-  Chart as ChartJS,
-
   CategoryScale,
-
+  Chart as ChartJS,
+  Filler,
   LinearScale,
-
-  PointElement,
-
   LineElement,
-
-  Title,
-
+  PointElement,
   Tooltip,
-
-  Legend,
-
 } from 'chart.js';
 
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
-
-ChartJS.register(
-
-  CategoryScale,
-
-  LinearScale,
-
-  PointElement,
-
-  LineElement,
-
-  Title,
-
-  Tooltip,
-
-  Legend
-
-);
-
-
+const GRID = 'rgba(160, 174, 192, 0.15)';
+const TICK = '#a0aec0';
 
 const ProgressChart = ({ data }) => {
-
   const chartData = {
-
-    labels: data.map(item => item.topic),
-
+    labels: data.map((r) => new Date(r.taken_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
     datasets: [
-
       {
-
-        label: 'Quiz Scores',
-
-        data: data.map(item => item.score),
-
-        fill: false,
-
-        borderColor: '#4F46E5',
-
-        tension: 0.1,
-
+        label: 'Score',
+        data: data.map((r) => r.score),
+        borderColor: '#2b6cb0',
+        backgroundColor: 'rgba(43, 108, 176, 0.15)',
+        pointBackgroundColor: '#e2e8f0',
+        fill: true,
+        tension: 0.3,
       },
-
     ],
-
   };
-
-
 
   const options = {
-
+    responsive: true,
+    maintainAspectRatio: false,
     scales: {
-
-      y: {
-
-        ticks: {
-
-          color: 'white',
-
-        }
-
-      },
-
-      x: {
-
-        ticks: {
-
-          color: 'white',
-
-        }
-
-      }
-
+      y: { min: 0, max: 100, ticks: { color: TICK, callback: (v) => `${v}%` }, grid: { color: GRID } },
+      x: { ticks: { color: TICK, maxRotation: 0, autoSkip: true }, grid: { display: false } },
     },
-
     plugins: {
-
-      legend: {
-
-        labels: {
-
-          color: 'white'
-
-        }
-
-      }
-
-    }
-
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => data[items[0].dataIndex].topic,
+          label: (item) => ` ${item.formattedValue}%`,
+        },
+      },
+    },
   };
 
-
-
-  return <Line data={chartData} options={options} />;
-
+  return (
+    <div className="h-64">
+      <Line data={chartData} options={options} aria-label="Quiz scores over time" role="img" />
+    </div>
+  );
 };
-
-
 
 export default ProgressChart;

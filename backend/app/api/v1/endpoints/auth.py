@@ -1,69 +1,36 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
 
+from app.api.deps import get_current_user
+from app.core.security import create_access_token, get_password_hash, verify_password
 from app.db.database import get_db
 from app.db.models import User
-from app.core.security import (
-    verify_password,
-    get_password_hash,
-    create_access_token,
-    decode_token,
-    oauth2_scheme,
-)
+from app.schemas import PasswordChange, RegisterRequest, TokenResponse, UserOut, UserUpdate
+from app.services import rag_service
 
 router = APIRouter()
 
 
-class RegisterRequest(BaseModel):
-    username: str
-    email: str
-    password: str
-
-
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    payload = decode_token(token)
-    if payload is None:
-        raise credentials_exception
-    username: str = payload.get("sub")
-    if username is None:
-        raise credentials_exception
-    user = db.query(User).filter(User.username == username).first()
-    if user is None:
-        raise credentials_exception
-    return user
-
-
-@router.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@router.post("/register")
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(request: RegisterRequest, db: Session = Depends(get_db)):
-    # Check for existing username or email
     if db.query(User).filter(User.username == request.username).first():
         raise HTTPException(status_code=400, detail="Username already registered")
-    if db.query(User).filter(User.email == request.email).first():
+    email = request.email.lower()
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_pw = get_password_hash(request.password)
-    user = User(username=request.username, email=request.email, hashed_password=hashed_pw)
+    user = User(
+        username=request.username,
+        email=email,
+        hashed_password=get_password_hash(request.password),
+    )
     db.add(user)
     db.commit()
-    db.refresh(user)
-
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer", "username": user.username}
+    return TokenResponse(access_token=create_access_token(user.username), username=user.username)
 
 
-@router.post("/login")
+@router.post("/login", response_model=TokenResponse)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -72,15 +39,47 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer", "username": user.username}
+    return TokenResponse(access_token=create_access_token(user.username), username=user.username)
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
-    return {
-        "id": current_user.id,
-        "username": current_user.username,
-        "email": current_user.email,
-        "created_at": current_user.created_at,
-    }
+    return current_user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    update: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if update.email is not None:
+        email = update.email.lower()
+        clash = db.query(User).filter(User.email == email, User.id != current_user.id).first()
+        if clash:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        current_user.email = email
+    if update.learning_goals is not None:
+        current_user.learning_goals = update.learning_goals.strip()
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    body: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    current_user.hashed_password = get_password_hash(body.new_password)
+    db.commit()
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rag_service.delete_user(current_user.id)
+    db.delete(current_user)
+    db.commit()

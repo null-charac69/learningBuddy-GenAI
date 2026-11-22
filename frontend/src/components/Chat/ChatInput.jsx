@@ -1,68 +1,54 @@
-
-import React, { useState, useEffect } from 'react';
-import { FiSend, FiMic, FiMicOff } from 'react-icons/fi';
+import React, { useEffect, useState } from 'react';
+import { FiMic, FiMicOff, FiSend } from 'react-icons/fi';
 import useSpeechRecognition from '../../hooks/useSpeechRecognition';
 
-const ChatInput = ({ onSendMessage }) => {
+const ChatInput = ({ onSendMessage, disabled }) => {
   const [message, setMessage] = useState('');
   const { transcript, isListening, isSupported, startListening, stopListening, setTranscript } =
     useSpeechRecognition();
 
-  // Sync transcript into input field
   useEffect(() => {
     if (transcript) setMessage(transcript);
   }, [transcript]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (message.trim()) {
-      onSendMessage(message);
-      setMessage('');
-      setTranscript('');
-    }
-  };
-
-  const handleMicClick = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
+  const submit = () => {
+    if (!message.trim() || disabled) return;
+    if (isListening) stopListening();
+    onSendMessage(message.trim());
+    setMessage('');
+    setTranscript('');
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 bg-secondary">
-      <div className="relative flex items-center gap-2">
-        <input
-          type="text"
+    <form
+      onSubmit={(e) => { e.preventDefault(); submit(); }}
+      className="p-4 border-t border-accent"
+    >
+      <div className="flex items-end gap-2">
+        <textarea
+          rows={1}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          className="flex-1 bg-accent text-text rounded-full py-3 px-4 pr-20 focus:outline-none focus:ring-2 focus:ring-highlight"
-          placeholder={isListening ? 'Listening...' : 'Type your message...'}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+          }}
+          className="input resize-none max-h-40"
+          placeholder={isListening ? 'Listening…' : 'Ask about your material (Shift+Enter for a new line)'}
+          aria-label="Message"
         />
-
-        {/* Mic button */}
         {isSupported && (
           <button
             type="button"
-            onClick={handleMicClick}
-            title={isListening ? 'Stop listening' : 'Start voice input'}
-            className={`absolute right-12 top-1/2 transform -translate-y-1/2 transition-colors ${
-              isListening
-                ? 'text-red-500 animate-pulse'
-                : 'text-gray-400 hover:text-highlight'
-            }`}
+            onClick={isListening ? stopListening : startListening}
+            title={isListening ? 'Stop listening' : 'Voice input'}
+            aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+            className={`btn-ghost px-3 ${isListening ? 'text-red-300 border-red-400 animate-pulse' : ''}`}
           >
-            {isListening ? <FiMicOff className="text-xl" /> : <FiMic className="text-xl" />}
+            {isListening ? <FiMicOff /> : <FiMic />}
           </button>
         )}
-
-        {/* Send button */}
-        <button
-          type="submit"
-          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-secondary hover:text-highlight transition-colors"
-        >
-          <FiSend className="text-2xl" />
+        <button type="submit" disabled={disabled || !message.trim()} className="btn-primary px-4" aria-label="Send">
+          <FiSend />
         </button>
       </div>
     </form>
