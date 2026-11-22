@@ -25,6 +25,8 @@ const ProgressChart = ({ data }) => {
         borderColor: '#2b6cb0',
         backgroundColor: 'rgba(43, 108, 176, 0.15)',
         pointBackgroundColor: '#e2e8f0',
+        pointRadius: 4,
+        pointHoverRadius: 6,
         fill: true,
         tension: 0.3,
       },

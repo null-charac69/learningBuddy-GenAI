@@ -23,7 +23,7 @@ const ChatMessage = ({ message, sender, sources = [], error }) => {
             {sources.map((s, i) => (
               <details key={`${s.document_id}-${i}`} className="text-xs text-text-secondary">
                 <summary className="cursor-pointer hover:text-text inline-flex items-center gap-1.5">
-                  <span className="text-highlight font-semibold">[{i + 1}]</span>
+                  <span className="text-blue-300 font-semibold">[{i + 1}]</span>
                   <FiFileText /> {s.filename}
                 </summary>
                 <p className="mt-1 pl-5 italic">{s.snippet}</p>

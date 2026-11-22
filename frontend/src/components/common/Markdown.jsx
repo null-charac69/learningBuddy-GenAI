@@ -16,7 +16,7 @@ export const renderInline = (text, keyPrefix = 'i') =>
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4)
       return <strong key={key}>{part.slice(2, -2)}</strong>;
     if (/^\[\d+\]$/.test(part))
-      return <sup key={key} className="text-highlight font-semibold mx-0.5">{part}</sup>;
+      return <sup key={key} className="text-blue-300 font-semibold mx-0.5">{part}</sup>;
     if (part.startsWith('*') && part.endsWith('*') && part.length > 2)
       return <em key={key}>{part.slice(1, -1)}</em>;
     return <React.Fragment key={key}>{part}</React.Fragment>;

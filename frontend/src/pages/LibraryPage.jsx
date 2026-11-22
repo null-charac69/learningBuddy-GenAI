@@ -121,7 +121,7 @@ const LibraryPage = () => {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{doc.filename}</p>
                   <p className="text-xs text-text-secondary">
-                    {formatDate(doc.uploaded_at)} · {doc.chunk_count} sections · {(doc.char_count / 1000).toFixed(1)}k characters
+                    {formatDate(doc.uploaded_at)} · {doc.chunk_count} {doc.chunk_count === 1 ? 'section' : 'sections'} · {(doc.char_count / 1000).toFixed(1)}k characters
                   </p>
                 </div>
                 <Link to={`/quiz?topic=${encodeURIComponent(doc.filename.replace(/\.[^.]+$/, ''))}`} className="text-sm text-highlight hover:underline hidden sm:block">
